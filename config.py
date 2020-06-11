@@ -1,0 +1,3 @@
+API_ID = 1400371
+API_HASH = 'cb0cacf0c10a8d87e5e308ceb35d1805'
+CHANNEL = 'lorem_i'
