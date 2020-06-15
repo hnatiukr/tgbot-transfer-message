@@ -102,11 +102,6 @@ def button_handler(update, context):
                 message_id=message_id,
             )
 
-# if not chat_id in reposted_chats and counter >= members / 2:
-#     reposted_chats[chat_id] = chat_id
-#     context.bot.send_message(
-#         chat_id=config.REPOST_CHANNEL, text=query.message.text)
-
 
 def main():
     updater = Updater(config.TOKEN, use_context=True)
