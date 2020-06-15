@@ -146,3 +146,4 @@ static
 anon.session
 *.session
 .vscode/
+draft.py
