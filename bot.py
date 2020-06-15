@@ -82,10 +82,23 @@ def button_handler(update, context):
     # We repost to another channel if the data matches the condition
     # If the likes is equal to or more than half of subscribers, bot sends a message to another chat
     # Check for repost to chat
-    if not chat_id in reposted_chats and counter >= members / 2:
-        reposted_chats[chat_id] = chat_id
+    if chat_id in reposted_chats:
+        if message_id in reposted_chats[chat_id]:
+            pass
+        else:
+            reposted_chats[chat_id].append(message_id)
+            context.bot.send_message(
+                chat_id=config.REPOST_CHANNEL, text=query.message.text)
+    else:
+        reposted_chats[chat_id] = list()
+        reposted_chats[chat_id].append(message_id)
         context.bot.send_message(
             chat_id=config.REPOST_CHANNEL, text=query.message.text)
+
+# if not chat_id in reposted_chats and counter >= members / 2:
+#     reposted_chats[chat_id] = chat_id
+#     context.bot.send_message(
+#         chat_id=config.REPOST_CHANNEL, text=query.message.text)
 
 
 def main():
