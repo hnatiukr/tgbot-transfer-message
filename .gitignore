@@ -144,3 +144,5 @@ static
 
 #
 anon.session
+*.session
+.vscode/

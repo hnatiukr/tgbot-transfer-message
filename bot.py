@@ -1,53 +1,72 @@
 import config
-from telethon import TelegramClient, sync, events
+import logging
 
-api_id = config.API_ID
-api_hash = config.API_HASH
-channel = config.CHANNEL
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
 
-client = TelegramClient('anon', api_id, api_hash)
-client.start()
-
-# TODO: The functions bellow must be called continuously or periodically to check for new messages
-# TODO: and collect information about reactions to them
-# TODO: bot should work in real time
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def get_participants_count():
-    ''' Get count of participants channel '''
-    get_participants = client.get_participants(channel)
-    participants = len(get_participants)
-    print(f'Participants in the channel: {participants}')
-    # TODO: Use counter for calculation logic.
-    return participants
+def start(update, context):
+    update.message.reply_text("Hi! Write smth to publish")
 
 
-get_participants_count()
+def button(update, context):
+    print(f' ********** UPDATE ********* {update}')
+    query = update.callback_query
+    chat_id = query.message.chat_id
+    message_id = query.message.message_id
+    # user_id = update.message.chat.id
+    prev_counter = query.message.reply_markup.inline_keyboard[0][0].callback_data
+
+    updated_counter = int(prev_counter) + 1
+
+    if updated_counter > 0:
+        button_content = f'👍 {updated_counter}'
+    else:
+        button_content = '👍'
+
+    keyboard = [[InlineKeyboardButton(
+        button_content, callback_data=updated_counter)]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.edit_message_reply_markup(
+        chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
 
 
-def get_messages():
-    ''' Get information about all messages in the channel '''
-    messages = client.get_messages(channel, limit=None)
-    return messages
+def help(update, context):
+    update.message.reply_text("Use /start to test this bot.")
 
 
-def get_message_reactions():
-    '''Get the number of clicked 'likes'  '''
-    messages = get_messages()
-
-    for message in messages:
-        message_reactions_count = message.to_dict(
-        )['reply_markup']['rows'][0]['buttons'][0]['text'][2:]
-
-        # Check if there is at least one 'like'
-        if message_reactions_count:
-            # TODO: lwrite the logic of sending a message to another channel / group
-            message_id = message.to_dict()['id']
-            print(
-                f'Message id: {message_id} has {message_reactions_count} reaction(s)')
+def error(update, context):
+    logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 
-get_message_reactions()
+def send_to_chat(update, context):
+    chat_id = config.CHAT_ID
+    button_content = '👍'
+
+    keyboard = [[InlineKeyboardButton(
+        button_content, callback_data=0)]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.send_message(
+        chat_id=chat_id, text=update.message.text, photo=update.message.photo, parse_mode='Markdown', reply_markup=reply_markup)
 
 
-client.run_until_disconnected()
+def main():
+    updater = Updater(config.TOKEN, use_context=True)
+    updater.dispatcher.add_handler(CommandHandler('start', start))
+    updater.dispatcher.add_handler(CallbackQueryHandler(button))
+    updater.dispatcher.add_handler(CommandHandler('help', help))
+    updater.dispatcher.add_handler(MessageHandler(
+        Filters.all & (~Filters.command), send_to_chat))
+    updater.dispatcher.add_error_handler(error)
+
+    updater.start_polling()
+    print(f'Bot is working now ...')
+    updater.idle()
+
+
+if __name__ == '__main__':
+    main()
