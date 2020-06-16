@@ -17,7 +17,7 @@ def start_cmd(update, context):
         name = 'anonym'
 
     # Welcome bot on command start
-    reply_text = f'Hi, {name}!\n\n'
+    reply_text = f'Hi, {name}!\n\nWith this bot, you can automatically forward the most popular chat messages to other chats.'
     update.message.reply_text(reply_text)
 
 
@@ -30,11 +30,18 @@ def error_handler(update, context):
 
 
 def attach_button(update, context):
+    root_chat_id = config.MAIN_CHAT
+    current_chat_id = update.channel_post.chat.id
+
     counter = 0
     button_content = '👍'
+
     keyboard = [[InlineKeyboardButton(button_content, callback_data=counter)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.channel_post.edit_reply_markup(reply_markup=reply_markup)
+
+    # 'Like' button is attached only in the root chat to which the bot is connected
+    if str(current_chat_id) == str(root_chat_id):
+        update.channel_post.edit_reply_markup(reply_markup=reply_markup)
 
 
 def button_handler(update, context):
@@ -93,7 +100,10 @@ def update_counter_value(update, context, button, counter):
     # Update counter on the 'like' button
 
     query = update.callback_query
-    chat_id = query.message.chat_id
+    # TODO: check chat id
+    # chat_id = query.message.chat_id
+    chat_id = config.MAIN_CHAT
+
     message_id = query.message.message_id
 
     keyboard = [[InlineKeyboardButton(button, callback_data=counter)]]
@@ -108,12 +118,16 @@ def is_message_forward(update, context, counter):
     # Check for repost to chat
     repost_to_chat = config.REPOST_CHAT
     query = update.callback_query
-    chat_id = query.message.chat_id
+
+    # TODO: check chat id
+    # chat_id = query.message.chat_id
+    chat_id = config.MAIN_CHAT
+
     message_id = query.message.message_id
     reposted_chats = context.chat_data
     members = context.bot.get_chat_members_count(chat_id=chat_id)
 
-    if counter >= members / 2:
+    if counter >= members / 2 or counter == 1:
         if chat_id in reposted_chats:
             if message_id in reposted_chats[chat_id]:
                 pass
