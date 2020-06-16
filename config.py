@@ -1,6 +1,2 @@
 TOKEN = '1274855381:AAHxPlDY60TNFcCsQ2o2L0MH3UmeekwCYtg'
-API_ID = 1400371
-API_HASH = 'cb0cacf0c10a8d87e5e308ceb35d1805'
-CHANNEL = 'lorem_i'
-CHAT_ID = '-1001252916744'
-REPOST_CHANNEL = '@fpigs'
+REPOST_CHAT = '@fpigs'  # chat for reposting

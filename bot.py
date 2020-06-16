@@ -1,6 +1,5 @@
 import config
 import logging
-from uuid import uuid4
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
 
@@ -32,7 +31,6 @@ def error_handler(update, context):
 
 def attach_button(update, context):
     counter = 0
-    # button_content = f'👍 {counter}'
     button_content = '👍'
     keyboard = [[InlineKeyboardButton(button_content, callback_data=counter)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -40,21 +38,31 @@ def attach_button(update, context):
 
 
 def button_handler(update, context):
+    # Check the status of the button counter, user identity. Change the value of the button.
+    counter = is_post_liked(update, context)
+
+    # Check for an empty value
+    button = is_count_empty(counter)
+
+    # Update button value. Send new data
+    update_counter_value(update, context, button, counter)
+
+    # If the message is popular, we send it to your favorite chats. False positive check
+    is_message_forward(update, context, counter)
+
+
+def is_post_liked(update, context):
+    # Create an object to store users who have already liked the post
+    # Check for matches. If it is already like - delete
 
     query = update.callback_query
-    chat_id = query.message.chat_id
     user_id = update._effective_user.id
     message_id = query.message.message_id
     voted_users = context.user_data
-    reposted_chats = context.chat_data
-    members = context.bot.get_chat_members_count(chat_id=chat_id)
     prev_counter = query.message.reply_markup.inline_keyboard[0][0].callback_data
 
     counter = 0
-    button_content = ''
 
-    # Create an object to store users who have already liked the post
-    # Check for matches. If it is already like - delete
     if message_id in voted_users:
         if user_id in voted_users[message_id]:
             voted_users[message_id].remove(user_id)
@@ -66,22 +74,45 @@ def button_handler(update, context):
         voted_users[message_id] = list()
         voted_users[message_id].append(user_id)
         counter = int(prev_counter) + 1
+    return counter
 
+
+def is_count_empty(counter):
     # If no one likes - do not show the counter
-    if counter < 1:
-        button_content = '👍'
-    else:
-        button_content = f'👍 {counter}'
+    button = ''
 
+    if counter < 1:
+        button = '👍'
+    else:
+        button = f'👍 {counter}'
+
+    return button
+
+
+def update_counter_value(update, context, button, counter):
     # Update counter on the 'like' button
-    keyboard = [[InlineKeyboardButton(button_content, callback_data=counter)]]
+
+    query = update.callback_query
+    chat_id = query.message.chat_id
+    message_id = query.message.message_id
+
+    keyboard = [[InlineKeyboardButton(button, callback_data=counter)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.edit_message_reply_markup(
         chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
 
-    # We repost to another channel if the data matches the condition
-    # If the likes is equal to or more than half of subscribers, bot sends a message to another chat
+
+def is_message_forward(update, context, counter):
+    # We repost to another channel if the data matches the condition (** 1/2 of members **)
+    # If the likes is equal to or more than half of subscribers, bot forward a message to another chat
     # Check for repost to chat
+    repost_to_chat = config.REPOST_CHAT
+    query = update.callback_query
+    chat_id = query.message.chat_id
+    message_id = query.message.message_id
+    reposted_chats = context.chat_data
+    members = context.bot.get_chat_members_count(chat_id=chat_id)
+
     if counter >= members / 2:
         if chat_id in reposted_chats:
             if message_id in reposted_chats[chat_id]:
@@ -89,7 +120,7 @@ def button_handler(update, context):
             else:
                 reposted_chats[chat_id].append(message_id)
                 context.bot.forward_message(
-                    chat_id=config.REPOST_CHANNEL,
+                    chat_id=repost_to_chat,
                     from_chat_id=chat_id,
                     message_id=message_id,
                 )
@@ -97,7 +128,7 @@ def button_handler(update, context):
             reposted_chats[chat_id] = list()
             reposted_chats[chat_id].append(message_id)
             context.bot.forward_message(
-                chat_id=config.REPOST_CHANNEL,
+                chat_id=repost_to_chat,
                 from_chat_id=chat_id,
                 message_id=message_id,
             )
