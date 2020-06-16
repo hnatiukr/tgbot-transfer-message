@@ -10,11 +10,7 @@ logger = logging.getLogger(__name__)
 
 def start_cmd(update, context):
     user = update.effective_user
-
-    if user:
-        name = user.first_name
-    else:
-        name = 'anonym'
+    name = user.user.first_name if user else 'anonym'
 
     # Welcome bot on command start
     reply_text = f'Hi, {name}!\n\nWith this bot, you can automatically forward the most popular chat messages to other chats.'
@@ -22,7 +18,7 @@ def start_cmd(update, context):
 
 
 def help_cmd(update, context):
-    update.message.reply_text("Use /start to test this bot.")
+    update.message.reply_text('Use /start to test this bot.')
 
 
 def error_handler(update, context):
@@ -53,7 +49,7 @@ def button_handler(update, context):
     counter = is_post_liked(update, context)
 
     # Check for an empty value
-    button = is_count_empty(counter)
+    button = button = '👍' if counter < 1 else f'👍 {counter}'
 
     # Update button value. Send new data
     update_counter_value(update, context, button, counter)
@@ -74,31 +70,23 @@ def is_post_liked(update, context):
 
     counter = 0
 
+    # If this message has already voted:
     if message_id in voted_users:
+        # If the current user has already voted, delete the vote:
         if user_id in voted_users[message_id]:
             voted_users[message_id].remove(user_id)
             counter = int(prev_counter) - 1
+        # Else -  add vote
         else:
             voted_users[message_id].append(user_id)
             counter = int(prev_counter) + 1
+    # If you have not yet voted for this message, create a list for votes and add vote:
     else:
         voted_users[message_id] = list()
         voted_users[message_id].append(user_id)
         counter = int(prev_counter) + 1
+
     return counter
-
-
-def is_count_empty(counter):
-    ''' If no one likes - do not show the counter '''
-
-    button = ''
-
-    if counter < 1:
-        button = '👍'
-    else:
-        button = f'👍 {counter}'
-
-    return button
 
 
 def update_counter_value(update, context, button, counter):
@@ -127,10 +115,14 @@ def is_message_forward(update, context, counter):
 
     members = context.bot.get_chat_members_count(chat_id=chat_id)
 
-    if counter >= members / 2 or counter == 1:
+    # If the button is pressed by the required number of users (1/2 of members):
+    if counter >= members / 2:
+        # Chat identity check:
         if chat_id in reposted_chats:
+            # If the current message has already reposted, do nothing
             if message_id in reposted_chats[chat_id]:
                 pass
+            # Else, remember the message and repost
             else:
                 reposted_chats[chat_id].append(message_id)
                 context.bot.forward_message(
@@ -138,6 +130,7 @@ def is_message_forward(update, context, counter):
                     from_chat_id=chat_id,
                     message_id=message_id,
                 )
+        # If the message is reposted for the first time from this chat, remember it and repost
         else:
             reposted_chats[chat_id] = list()
             reposted_chats[chat_id].append(message_id)
