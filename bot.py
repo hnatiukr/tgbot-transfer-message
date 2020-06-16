@@ -30,6 +30,8 @@ def error_handler(update, context):
 
 
 def attach_button(update, context):
+    ''' Attach a button to each message '''
+
     root_chat_id = config.MAIN_CHAT
     current_chat_id = update.channel_post.chat.id
 
@@ -45,6 +47,8 @@ def attach_button(update, context):
 
 
 def button_handler(update, context):
+    ''' "Like" button click handler '''
+
     # Check the status of the button counter, user identity. Change the value of the button.
     counter = is_post_liked(update, context)
 
@@ -59,8 +63,8 @@ def button_handler(update, context):
 
 
 def is_post_liked(update, context):
-    # Create an object to store users who have already liked the post
-    # Check for matches. If it is already like - delete
+    ''' Create an object to store users who have already liked the post
+    Check for matches. If it is already like - delete '''
 
     query = update.callback_query
     user_id = update._effective_user.id
@@ -85,7 +89,8 @@ def is_post_liked(update, context):
 
 
 def is_count_empty(counter):
-    # If no one likes - do not show the counter
+    ''' If no one likes - do not show the counter '''
+
     button = ''
 
     if counter < 1:
@@ -97,13 +102,10 @@ def is_count_empty(counter):
 
 
 def update_counter_value(update, context, button, counter):
-    # Update counter on the 'like' button
+    ''' Update counter on the 'like' button '''
 
     query = update.callback_query
-    # TODO: check chat id
-    # chat_id = query.message.chat_id
     chat_id = config.MAIN_CHAT
-
     message_id = query.message.message_id
 
     keyboard = [[InlineKeyboardButton(button, callback_data=counter)]]
@@ -113,18 +115,16 @@ def update_counter_value(update, context, button, counter):
 
 
 def is_message_forward(update, context, counter):
-    # We repost to another channel if the data matches the condition (** 1/2 of members **)
-    # If the likes is equal to or more than half of subscribers, bot forward a message to another chat
-    # Check for repost to chat
+    ''' We repost to another channel if the data matches the condition (** 1/2 of members **)
+    If the likes is equal to or more than half of subscribers, bot forward a message to another chat
+    Check for repost to chat '''
+
+    chat_id = config.MAIN_CHAT
     repost_to_chat = config.REPOST_CHAT
     query = update.callback_query
-
-    # TODO: check chat id
-    # chat_id = query.message.chat_id
-    chat_id = config.MAIN_CHAT
-
     message_id = query.message.message_id
     reposted_chats = context.chat_data
+
     members = context.bot.get_chat_members_count(chat_id=chat_id)
 
     if counter >= members / 2 or counter == 1:
