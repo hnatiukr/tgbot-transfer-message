@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def start_cmd(update, context):
     user = update.effective_user
-    name = user.user.first_name if user else 'anonym'
+    name = user.first_name if user else 'anonym'
 
     # Welcome bot on command start
     reply_text = f'Hi, {name}!\n\nWith this bot, you can automatically forward the most popular chat messages to other chats.'
@@ -28,17 +28,17 @@ def error_handler(update, context):
 def attach_button(update, context):
     ''' Attach a button to each message '''
 
-    root_chat_id = config.MAIN_CHAT
+    root_chat_id = config.ROOT_CHAT
     current_chat_id = update.channel_post.chat.id
-
-    counter = 0
-    button_content = '👍'
-
-    keyboard = [[InlineKeyboardButton(button_content, callback_data=counter)]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
 
     # 'Like' button is attached only in the root chat to which the bot is connected
     if str(current_chat_id) == str(root_chat_id):
+        counter = 0
+        button_content = '👍'
+
+        keyboard = [[InlineKeyboardButton(
+            button_content, callback_data=counter)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         update.channel_post.edit_reply_markup(reply_markup=reply_markup)
 
 
@@ -93,7 +93,7 @@ def update_counter_value(update, context, button, counter):
     ''' Update counter on the 'like' button '''
 
     query = update.callback_query
-    chat_id = config.MAIN_CHAT
+    chat_id = config.ROOT_CHAT
     message_id = query.message.message_id
 
     keyboard = [[InlineKeyboardButton(button, callback_data=counter)]]
@@ -107,7 +107,7 @@ def is_message_forward(update, context, counter):
     If the likes is equal to or more than half of subscribers, bot forward a message to another chat
     Check for repost to chat '''
 
-    chat_id = config.MAIN_CHAT
+    chat_id = config.ROOT_CHAT
     repost_to_chat = config.REPOST_CHAT
     query = update.callback_query
     message_id = query.message.message_id
