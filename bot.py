@@ -1,7 +1,7 @@
 import config
 import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, PicklePersistence
 
 
 logging.basicConfig(
@@ -129,7 +129,9 @@ def try_forward_message(update, context):
 
 
 def main():
-    updater = Updater(config.TOKEN, use_context=True)
+    my_persistence = PicklePersistence(filename='bot_data')
+    updater = Updater(
+        config.TOKEN, persistence=my_persistence, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler('start', start_cmd))
     dp.add_handler(CommandHandler('help', help_cmd))

@@ -146,4 +146,5 @@ static
 anon.session
 *.session
 .vscode/
+bot_data
 draft.py
