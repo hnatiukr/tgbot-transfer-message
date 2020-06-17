@@ -3,6 +3,7 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
 
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def start_cmd(update, context):
     user = update.effective_user
-    name = user.first_name if user else 'anonym'
+    name = user.user.first_name if user else 'anonym'
 
     # Welcome bot on command start
     reply_text = f'Hi, {name}!\n\nWith this bot, you can automatically forward the most popular chat messages to other chats.'
