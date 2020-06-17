@@ -28,18 +28,20 @@ def error_handler(update, context):
 def attach_button(update, context):
     ''' Attach a button to each message '''
 
-    root_chat_id = config.ROOT_CHAT
-    current_chat_id = update.channel_post.chat.id
+    # Check for chat type (channel)
+    if update.channel_post:
+        root_chat_id = config.ROOT_CHAT
+        current_chat_id = update.channel_post.chat.id
 
-    # 'Like' button is attached only in the root chat to which the bot is connected
-    if str(current_chat_id) == str(root_chat_id):
-        counter = 0
-        button_content = '👍'
+        # 'Like' button is attached only in the root chat to which the bot is connected
+        if str(current_chat_id) == str(root_chat_id):
+            counter = 0
+            button_content = '👍'
 
-        keyboard = [[InlineKeyboardButton(
-            button_content, callback_data=counter)]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        update.channel_post.edit_reply_markup(reply_markup=reply_markup)
+            keyboard = [[InlineKeyboardButton(
+                button_content, callback_data=counter)]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.channel_post.edit_reply_markup(reply_markup=reply_markup)
 
 
 def button_handler(update, context):
