@@ -56,8 +56,13 @@ def button_handler(update, context):
     # Update button value. Send new data
     update_counter_value(update, context, button, counter)
 
-    # If the message is popular, we send it to your favorite chats. False positive check
-    is_message_forward(update, context, counter)
+    # If the message is popular, we send it to your favorite chats.
+    # now: (1/2 of members)
+    chat_id = config.ROOT_CHAT
+    members = context.bot.get_chat_members_count(chat_id=chat_id)
+
+    if counter >= members / 2:
+        try_forward_message(update, context)
 
 
 def is_post_liked(update, context):
@@ -104,43 +109,27 @@ def update_counter_value(update, context, button, counter):
         chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
 
 
-def is_message_forward(update, context, counter):
-    ''' We repost to another channel if the data matches the condition (** 1/2 of members **)
-    If the likes is equal to or more than half of subscribers, bot forward a message to another chat
-    Check for repost to chat '''
+def try_forward_message(update, context):
+    ''' Bot forward a message to another chat '''
 
     chat_id = config.ROOT_CHAT
-    repost_to_chat = config.REPOST_CHAT
-    query = update.callback_query
-    message_id = query.message.message_id
-    reposted_chats = context.chat_data
+    message_id = update.callback_query.message.message_id
+    chat_data = context.chat_data
 
-    members = context.bot.get_chat_members_count(chat_id=chat_id)
+    # If there are no current chat entries
+    if chat_id not in chat_data:
+        chat_data[chat_id] = []
 
-    # If the button is pressed by the required number of users (1/2 of members):
-    if counter >= members / 2:
-        # Chat identity check:
-        if chat_id in reposted_chats:
-            # If the current message has already reposted, do nothing
-            if message_id in reposted_chats[chat_id]:
-                pass
-            # Else, remember the message and repost
-            else:
-                reposted_chats[chat_id].append(message_id)
-                context.bot.forward_message(
-                    chat_id=repost_to_chat,
-                    from_chat_id=chat_id,
-                    message_id=message_id,
-                )
-        # If the message is reposted for the first time from this chat, remember it and repost
-        else:
-            reposted_chats[chat_id] = list()
-            reposted_chats[chat_id].append(message_id)
-            context.bot.forward_message(
-                chat_id=repost_to_chat,
-                from_chat_id=chat_id,
-                message_id=message_id,
-            )
+    # If the current message has not already reposted, remember it and repost
+    if message_id not in chat_data[chat_id]:
+        chat_to_repost = config.REPOST_CHAT
+
+        chat_data[chat_id].append(message_id)
+        context.bot.forward_message(
+            chat_id=chat_to_repost,
+            from_chat_id=chat_id,
+            message_id=message_id,
+        )
 
 
 def main():
