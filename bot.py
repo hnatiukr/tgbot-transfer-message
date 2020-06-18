@@ -1,8 +1,17 @@
-import config
+import os
 import logging
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, PicklePersistence
+from dotenv import load_dotenv
+from telegram.ext import (Updater, CommandHandler, CallbackQueryHandler,
+                          MessageHandler, Filters, PicklePersistence)
+from telegram import (InlineKeyboardButton, InlineKeyboardMarkup)
 
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+
+TOKEN = os.environ.get("TOKEN")
+ROOT_CHAT = os.environ.get("ROOT_CHAT")
+REPOST_CHAT = os.environ.get("REPOST_CHAT")
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -14,7 +23,8 @@ def start_cmd(update, context):
     name = user.first_name if user else 'anonym'
 
     # Welcome bot on command start
-    reply_text = f'Hi, {name}!\n\nWith this bot, you can automatically forward the most popular chat messages to other chats.'
+    reply_text = f'''Hi, {name}!\n\nWith this bot, you can automatically 
+                forward the most popular chat messages to other chats.'''
     update.message.reply_text(reply_text)
 
 
@@ -31,7 +41,7 @@ def attach_button(update, context):
 
     # Check for chat type (channel)
     if update.channel_post:
-        root_chat_id = config.ROOT_CHAT
+        root_chat_id = ROOT_CHAT
         current_chat_id = update.channel_post.chat.id
 
         # 'Like' button is attached only in the root chat to which the bot is connected
@@ -59,11 +69,11 @@ def button_handler(update, context):
 
     # If the message is popular, we send it to your favorite chats.
     # now: (1/2 of members)
-    chat_id = config.ROOT_CHAT
+    chat_id = ROOT_CHAT
     members = context.bot.get_chat_members_count(chat_id=chat_id)
 
     if counter >= members / 2:
-        try_forward_message(update, context)
+        forward_message(update, context)
 
 
 def get_like_count(update, context):
@@ -72,9 +82,9 @@ def get_like_count(update, context):
 
     user_data = context.user_data
     user_id = update._effective_user.id
-    message_id = update.callback_query.message.message_id
-    prev_counter = update.callback_query.message.reply_markup.inline_keyboard[
-        0][0].callback_data
+    message_query = update.callback_query.message
+    message_id = message_query.message_id
+    prev_counter = message_query.reply_markup.inline_keyboard[0][0].callback_data
 
     counter = 0
 
@@ -96,7 +106,7 @@ def get_like_count(update, context):
 def update_counter_value(update, context, button, counter):
     ''' Update counter on the 'like' button '''
 
-    chat_id = config.ROOT_CHAT
+    chat_id = ROOT_CHAT
     message_id = update.callback_query.message.message_id
 
     keyboard = [[InlineKeyboardButton(button, callback_data=counter)]]
@@ -105,10 +115,10 @@ def update_counter_value(update, context, button, counter):
         chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
 
 
-def try_forward_message(update, context):
+def forward_message(update, context):
     ''' Bot forward a message to another chat '''
 
-    chat_id = config.ROOT_CHAT
+    chat_id = ROOT_CHAT
     message_id = update.callback_query.message.message_id
     chat_data = context.chat_data
 
@@ -118,7 +128,7 @@ def try_forward_message(update, context):
 
     # If the current message has not already reposted, remember it and repost
     if message_id not in chat_data[chat_id]:
-        chat_to_repost = config.REPOST_CHAT
+        chat_to_repost = REPOST_CHAT
 
         chat_data[chat_id].append(message_id)
         context.bot.forward_message(
@@ -130,8 +140,7 @@ def try_forward_message(update, context):
 
 def main():
     my_persistence = PicklePersistence(filename='bot_data')
-    updater = Updater(
-        config.TOKEN, persistence=my_persistence, use_context=True)
+    updater = Updater(TOKEN, persistence=my_persistence, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler('start', start_cmd))
     dp.add_handler(CommandHandler('help', help_cmd))
