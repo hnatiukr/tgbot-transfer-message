@@ -48,10 +48,10 @@ def button_handler(update, context):
     ''' "Like" button click handler '''
 
     # Check the status of the button counter, user identity. Change the value of the button.
-    counter = is_post_liked(update, context)
+    counter = get_like_count(update, context)
 
     # Check for an empty value
-    button = button = '👍' if counter < 1 else f'👍 {counter}'
+    button = '👍' if counter < 1 else f'👍 {counter}'
 
     # Update button value. Send new data
     update_counter_value(update, context, button, counter)
@@ -65,32 +65,28 @@ def button_handler(update, context):
         try_forward_message(update, context)
 
 
-def is_post_liked(update, context):
+def get_like_count(update, context):
     ''' Create an object to store users who have already liked the post
     Check for matches. If it is already like - delete '''
 
-    query = update.callback_query
+    user_data = context.user_data
     user_id = update._effective_user.id
-    message_id = query.message.message_id
-    voted_users = context.user_data
-    prev_counter = query.message.reply_markup.inline_keyboard[0][0].callback_data
+    message_id = update.callback_query.message.message_id
+    prev_counter = update.callback_query.message.reply_markup.inline_keyboard[
+        0][0].callback_data
 
     counter = 0
 
     # If this message has already voted:
-    if message_id in voted_users:
-        # If the current user has already voted, delete the vote:
-        if user_id in voted_users[message_id]:
-            voted_users[message_id].remove(user_id)
-            counter = int(prev_counter) - 1
-        # Else -  add vote
-        else:
-            voted_users[message_id].append(user_id)
-            counter = int(prev_counter) + 1
-    # If you have not yet voted for this message, create a list for votes and add vote:
+    if message_id not in user_data:
+        user_data[message_id] = []
+    # If the current user has already voted, delete the vote:
+    if user_id in user_data[message_id]:
+        user_data[message_id].remove(user_id)
+        counter = int(prev_counter) - 1
+    # Else -  add vote
     else:
-        voted_users[message_id] = list()
-        voted_users[message_id].append(user_id)
+        user_data[message_id].append(user_id)
         counter = int(prev_counter) + 1
 
     return counter
@@ -99,9 +95,8 @@ def is_post_liked(update, context):
 def update_counter_value(update, context, button, counter):
     ''' Update counter on the 'like' button '''
 
-    query = update.callback_query
     chat_id = config.ROOT_CHAT
-    message_id = query.message.message_id
+    message_id = update.callback_query.message.message_id
 
     keyboard = [[InlineKeyboardButton(button, callback_data=counter)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
