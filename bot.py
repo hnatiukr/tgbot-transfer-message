@@ -1,7 +1,6 @@
 import os
 import logging
 import telegram.ext
-from collections import deque
 from dotenv import load_dotenv
 from telegram.ext import (Updater, CommandHandler, CallbackQueryHandler,
                           MessageHandler, Filters, PicklePersistence)
@@ -74,7 +73,7 @@ def button_handler(update, context):
     members = context.bot.get_chat_members_count(chat_id=chat_id)
 
     if counter >= members / 2:
-        job_queue(update, context)
+        queue_job(update, context)
 
 
 def get_like_count(update, context):
@@ -116,7 +115,7 @@ def update_counter_value(update, context, button, counter):
         chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
 
 
-def job_queue(update, context):
+def queue_job(update, context):
     ''' Remember the current message and add to the job queue '''
 
     message_id = update.callback_query.message.message_id
@@ -129,12 +128,12 @@ def job_queue(update, context):
 
     # Create queue if not exist:
     if 'queue' not in bot_data:
-        bot_data['queue'] = deque()
+        bot_data['queue'] = []
 
     # If the current message has not already reposted, remember it and add to the queue:
     if message_id not in chat_data[ROOT_CHAT]:
         chat_data[ROOT_CHAT].append(message_id)
-        bot_data['queue'].append(message_id)
+        bot_data['queue'].insert(0, message_id)
 
 
 def forward_message(context: telegram.ext.CallbackContext):
@@ -143,17 +142,19 @@ def forward_message(context: telegram.ext.CallbackContext):
     bot_data = context.job.context[0]
 
     # If the queue has not yet been created, exit the function:
-    if 'queue' in bot_data:
-        queue = bot_data['queue']
+    if 'queue' not in bot_data:
+        return
 
-        # If the queue is empty, exit the function:
-        if len(queue) > 0:
-            message_id = queue.popleft()
-            context.bot.forward_message(
-                chat_id=REPOST_CHAT,
-                from_chat_id=ROOT_CHAT,
-                message_id=message_id,
-            )
+    # If there are elements in the queue, forward the message:
+    queue = bot_data['queue']
+
+    if len(queue) > 0:
+        message_id = queue.pop()
+        context.bot.forward_message(
+            chat_id=REPOST_CHAT,
+            from_chat_id=ROOT_CHAT,
+            message_id=message_id,
+        )
 
 
 def main():
