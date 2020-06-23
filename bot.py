@@ -170,7 +170,7 @@ def main():
     j = updater.job_queue
     job_minute = j.run_repeating(
         forward_message,
-        interval=5,
+        interval=3600,
         first=0,
         context=[ud.bot_data]
     )
