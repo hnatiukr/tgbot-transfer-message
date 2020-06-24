@@ -1,5 +1,6 @@
 import os
 import logging
+import telegram.ext
 from dotenv import load_dotenv
 from telegram.ext import (Updater, CommandHandler, CallbackQueryHandler,
                           MessageHandler, Filters, PicklePersistence)
@@ -9,13 +10,13 @@ dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 
-TOKEN = os.environ.get("TOKEN")
-ROOT_CHAT = os.environ.get("ROOT_CHAT")
-REPOST_CHAT = os.environ.get("REPOST_CHAT")
-
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+TOKEN = os.environ.get("TOKEN")
+ROOT_CHAT = os.environ.get("ROOT_CHAT")
+REPOST_CHAT = os.environ.get("REPOST_CHAT")
 
 
 def start_cmd(update, context):
@@ -23,8 +24,7 @@ def start_cmd(update, context):
     name = user.first_name if user else 'anonym'
 
     # Welcome bot on command start
-    reply_text = f'''Hi, {name}!\n\nWith this bot, you can automatically 
-                forward the most popular chat messages to other chats.'''
+    reply_text = f'''Hi, {name}!\n\nWith this bot, you can automatically forward the most popular chat messages to other chats.'''
     update.message.reply_text(reply_text)
 
 
@@ -73,7 +73,7 @@ def button_handler(update, context):
     members = context.bot.get_chat_members_count(chat_id=chat_id)
 
     if counter >= members / 2:
-        forward_message(update, context)
+        queue_job(update, context)
 
 
 def get_like_count(update, context):
@@ -115,25 +115,44 @@ def update_counter_value(update, context, button, counter):
         chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
 
 
-def forward_message(update, context):
-    ''' Bot forward a message to another chat '''
+def queue_job(update, context):
+    ''' Remember the current message and add to the job queue '''
 
-    chat_id = ROOT_CHAT
     message_id = update.callback_query.message.message_id
     chat_data = context.chat_data
+    bot_data = context.bot_data
 
-    # If there are no current chat entries
-    if chat_id not in chat_data:
-        chat_data[chat_id] = []
+    # If there are no current chat entries:
+    if ROOT_CHAT not in chat_data:
+        chat_data[ROOT_CHAT] = []
 
-    # If the current message has not already reposted, remember it and repost
-    if message_id not in chat_data[chat_id]:
-        chat_to_repost = REPOST_CHAT
+    # Create queue if not exist:
+    if 'queue' not in bot_data:
+        bot_data['queue'] = []
 
-        chat_data[chat_id].append(message_id)
+    # If the current message has not already reposted, remember it and add to the queue:
+    if message_id not in chat_data[ROOT_CHAT]:
+        chat_data[ROOT_CHAT].append(message_id)
+        bot_data['queue'].insert(0, message_id)
+
+
+def forward_message(context: telegram.ext.CallbackContext):
+    ''' Bot forward a message to another chat from queue once an hour '''
+
+    bot_data = context.job.context[0]
+
+    # If the queue has not yet been created, exit the function:
+    if 'queue' not in bot_data:
+        return
+
+    # If there are elements in the queue, forward the message:
+    queue = bot_data['queue']
+
+    if len(queue) > 0:
+        message_id = queue.pop()
         context.bot.forward_message(
-            chat_id=chat_to_repost,
-            from_chat_id=chat_id,
+            chat_id=REPOST_CHAT,
+            from_chat_id=ROOT_CHAT,
             message_id=message_id,
         )
 
@@ -141,13 +160,21 @@ def forward_message(update, context):
 def main():
     my_persistence = PicklePersistence(filename='bot_data')
     updater = Updater(TOKEN, persistence=my_persistence, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler('start', start_cmd))
-    dp.add_handler(CommandHandler('help', help_cmd))
-    dp.add_handler(MessageHandler(
+    ud = updater.dispatcher
+    ud.add_handler(CommandHandler('start', start_cmd))
+    ud.add_handler(CommandHandler('help', help_cmd))
+    ud.add_handler(MessageHandler(
         Filters.all & (~Filters.command), attach_button))
-    dp.add_handler(CallbackQueryHandler(button_handler))
-    # updater.dispatcher.add_error_handler(error_handler)
+    ud.add_handler(CallbackQueryHandler(button_handler))
+    # ud.add_error_handler(error_handler)
+
+    j = updater.job_queue
+    job_minute = j.run_repeating(
+        forward_message,
+        interval=3600,
+        first=0,
+        context=[ud.bot_data]
+    )
 
     updater.start_polling()
     print(f'Bot is working now ...')
