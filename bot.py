@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get("TOKEN")
 ROOT_CHAT = os.environ.get("ROOT_CHAT")
 REPOST_CHAT = os.environ.get("REPOST_CHAT")
-QUEUE_INTERVAL = os.environ.get("QUEUE_INTERVAL")
+QUEUE_INTERVAL = os.environ.get("QUEUE_INTERVAL", 3600)
 
 
 def start_cmd(update, context):
