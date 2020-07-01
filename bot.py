@@ -1,7 +1,6 @@
 import os
 import logging
 import telegram.ext
-from os import environ
 from dotenv import load_dotenv
 from telegram.ext import (Updater, CommandHandler, CallbackQueryHandler,
                           MessageHandler, Filters, PicklePersistence)
