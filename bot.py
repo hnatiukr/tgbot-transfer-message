@@ -72,7 +72,7 @@ def button_handler(update, context):
     chat_id = ROOT_CHAT
     members = context.bot.get_chat_members_count(chat_id=chat_id)
 
-    if counter >= members / 2:
+    if counter >= members / 2 or counter >= 1:
         queue_job(update, context)
 
 
@@ -135,19 +135,6 @@ def queue_job(update, context):
         chat_data[ROOT_CHAT].append(message_id)
         bot_data['queue'].insert(0, message_id)
 
-        # Notification that a new message has been added to the publication queue
-        context.bot.forward_message(
-            chat_id=78568917,
-            from_chat_id=ROOT_CHAT,
-            message_id=message_id,
-            disable_notification=True
-        )
-        context.bot.send_message(
-            chat_id=78568917,
-            text='Message queued for publication 🔝',
-            disable_notification=True
-        )
-
 
 def forward_message(context: telegram.ext.CallbackContext):
     ''' Bot forward a message to another chat from queue once an hour '''
@@ -184,7 +171,7 @@ def main():
     j = updater.job_queue
     job_minute = j.run_repeating(
         forward_message,
-        interval=3600,
+        interval=10,
         first=0,
         context=[ud.bot_data]
     )
