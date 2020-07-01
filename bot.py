@@ -1,6 +1,7 @@
 import os
 import logging
 import telegram.ext
+from os import environ
 from dotenv import load_dotenv
 from telegram.ext import (Updater, CommandHandler, CallbackQueryHandler,
                           MessageHandler, Filters, PicklePersistence)
@@ -72,7 +73,7 @@ def button_handler(update, context):
     chat_id = ROOT_CHAT
     members = context.bot.get_chat_members_count(chat_id=chat_id)
 
-    if counter >= members / 2 or counter >= 1:
+    if counter >= members / 2:
         queue_job(update, context)
 
 
