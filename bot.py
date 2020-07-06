@@ -43,10 +43,10 @@ def attach_button(update, context):
 
     # Check for chat type:
     if update.channel_post:
-        current_chat_id = update.channel_post.chat.id
+        current_chat_name = update.channel_post.chat.username
 
         # 'Like' button is attached only in the root chat to which the bot is connected
-        if str(current_chat_id) == str(ROOT_CHAT):
+        if str(current_chat_name) == str(ROOT_CHAT[1:]):
             counter = 0
             button_content = '👍'
 
@@ -70,8 +70,7 @@ def button_handler(update, context):
 
     # If the message is popular, we send it to your favorite chats.
     # now: (1/2 of members)
-    chat_id = ROOT_CHAT
-    members = context.bot.get_chat_members_count(chat_id=chat_id)
+    members = context.bot.get_chat_members_count(chat_id=ROOT_CHAT)
 
     if COUNT != 0 and counter >= COUNT:
         queue_job(update, context)
@@ -109,13 +108,12 @@ def get_like_count(update, context):
 def update_counter_value(update, context, button, counter):
     ''' Update counter on the 'like' button '''
 
-    chat_id = ROOT_CHAT
     message_id = update.callback_query.message.message_id
 
     keyboard = [[InlineKeyboardButton(button, callback_data=counter)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.edit_message_reply_markup(
-        chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
+        chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
 
 
 def queue_job(update, context):
