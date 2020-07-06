@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get("TOKEN")
 ROOT_CHAT = os.environ.get("ROOT_CHAT")
 REPOST_CHAT = os.environ.get("REPOST_CHAT")
-QUEUE_INTERVAL = os.environ.get("QUEUE_INTERVAL", 3600)
+QUEUE_INTERVAL = int(os.environ.get("QUEUE_INTERVAL", 3600))
 
 
 def start_cmd(update, context):
@@ -186,7 +186,7 @@ def main():
     job_minute = j.run_repeating(
         forward_message,
         interval=QUEUE_INTERVAL,
-        first=0,
+        # first=0,
         context=[ud.bot_data]
     )
 
