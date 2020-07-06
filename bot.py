@@ -18,6 +18,7 @@ TOKEN = os.environ.get("TOKEN")
 ROOT_CHAT = os.environ.get("ROOT_CHAT")
 REPOST_CHAT = os.environ.get("REPOST_CHAT")
 QUEUE_INTERVAL = int(os.environ.get("QUEUE_INTERVAL", 3600))
+COUNT = int(os.environ.get("COUNT"))
 
 
 def start_cmd(update, context):
@@ -40,13 +41,12 @@ def error_handler(update, context):
 def attach_button(update, context):
     ''' Attach a button to each message '''
 
-    # Check for chat type (channel)
+    # Check for chat type:
     if update.channel_post:
-        root_chat_id = ROOT_CHAT
         current_chat_id = update.channel_post.chat.id
 
         # 'Like' button is attached only in the root chat to which the bot is connected
-        if str(current_chat_id) == str(root_chat_id):
+        if str(current_chat_id) == str(ROOT_CHAT):
             counter = 0
             button_content = '👍'
 
@@ -73,7 +73,9 @@ def button_handler(update, context):
     chat_id = ROOT_CHAT
     members = context.bot.get_chat_members_count(chat_id=chat_id)
 
-    if counter >= members / 2:
+    if COUNT != 0 and counter >= COUNT:
+        queue_job(update, context)
+    elif counter >= members / 2:
         queue_job(update, context)
 
 
