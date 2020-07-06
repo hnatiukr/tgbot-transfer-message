@@ -20,18 +20,34 @@ REPOST_CHAT = os.environ.get("REPOST_CHAT")
 QUEUE_INTERVAL = int(os.environ.get("QUEUE_INTERVAL", 3600))
 COUNT = int(os.environ.get("COUNT"))
 
+USER_ID = 0
+
 
 def start_cmd(update, context):
     user = update.effective_user
     name = user.first_name if user else 'anonym'
 
+    global USER_ID
+    USER_ID = update.message.chat.id
+
     # Welcome bot on command start
-    reply_text = f'''Hi, {name}!\n\nWith this bot, you can automatically forward the most popular chat messages to other chats.'''
+    reply_text = f'''Hi, {name}!\n\n
+    With this bot, you can automatically forward the most popular chat messages from channel to other chats.\n\n
+    Before to start check your configuration settings:\n
+    Channel for posts: {ROOT_CHAT}
+    Channel for reposts: {REPOST_CHAT}
+    Time interval between reposts (sec): {QUEUE_INTERVAL}
+    Minimum number of likes (if 0 - half the channel’s subscribers): {COUNT}
+    '''
     update.message.reply_text(reply_text)
 
 
 def help_cmd(update, context):
     update.message.reply_text('Use /start to test this bot.')
+
+
+def id_cmd(update, context):
+    update.message.reply_text(f'Your ID is: {update.message.chat.id}')
 
 
 def error_handler(update, context):
@@ -72,6 +88,8 @@ def button_handler(update, context):
     # now: (1/2 of members)
     members = context.bot.get_chat_members_count(chat_id=ROOT_CHAT)
 
+    print(update)
+
     if COUNT != 0 and counter >= COUNT:
         queue_job(update, context)
     elif counter >= members / 2:
@@ -109,7 +127,6 @@ def update_counter_value(update, context, button, counter):
     ''' Update counter on the 'like' button '''
 
     message_id = update.callback_query.message.message_id
-
     keyboard = [[InlineKeyboardButton(button, callback_data=counter)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.edit_message_reply_markup(
@@ -138,13 +155,13 @@ def queue_job(update, context):
 
         # Notification that a new message has been added to the publication queue
         context.bot.forward_message(
-            chat_id=78568917,
+            chat_id=USER_ID,
             from_chat_id=ROOT_CHAT,
             message_id=message_id,
             disable_notification=True
         )
         context.bot.send_message(
-            chat_id=78568917,
+            chat_id=USER_ID,
             text='Message queued for publication 🔝',
             disable_notification=True
         )
@@ -177,6 +194,7 @@ def main():
     ud = updater.dispatcher
     ud.add_handler(CommandHandler('start', start_cmd))
     ud.add_handler(CommandHandler('help', help_cmd))
+    ud.add_handler(CommandHandler('id', id_cmd))
     ud.add_handler(MessageHandler(
         Filters.all & (~Filters.command), attach_button))
     ud.add_handler(CallbackQueryHandler(button_handler))
