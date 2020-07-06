@@ -1,5 +1,6 @@
 import os
 import logging
+import datetime
 import telegram.ext
 from dotenv import load_dotenv
 from telegram.ext import (Updater, CommandHandler, CallbackQueryHandler,
@@ -159,10 +160,18 @@ def queue_job(update, context):
             message_id=message_id,
             disable_notification=True
         )
+
+        waiting_time = len(bot_data['queue']) * QUEUE_INTERVAL
+        datetime_now = datetime.datetime.now()
+        post_time = datetime_now + datetime.timedelta(seconds=waiting_time)
+        formated_time = post_time.strftime("%H:%M")
+
         context.bot.send_message(
             chat_id=USER_ID,
-            text='Message queued for publication 🔝',
-            disable_notification=True
+            text=f'''The message has been added to the queue🔝 
+            \nand will be published at *{formated_time}* on the {REPOST_CHAT} channel''',
+            disable_notification=True,
+            parse_mode=telegram.ParseMode.MARKDOWN
         )
 
 
