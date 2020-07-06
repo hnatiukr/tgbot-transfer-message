@@ -89,8 +89,6 @@ def button_handler(update, context):
     # now: (1/2 of members)
     members = context.bot.get_chat_members_count(chat_id=ROOT_CHAT)
 
-    print(update)
-
     if COUNT != 0 and counter >= COUNT:
         queue_job(update, context)
     elif counter >= members / 2:
