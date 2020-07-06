@@ -36,6 +36,7 @@ def start_cmd(update, context):
     Before to start check your configuration settings:\n
     Channel for posts: {ROOT_CHAT}
     Channel for reposts: {REPOST_CHAT}
+    Your user ID: {USER_ID}
     Time interval between reposts (sec): {QUEUE_INTERVAL}
     Minimum number of likes (if 0 - half the channel’s subscribers): {COUNT}
     '''
