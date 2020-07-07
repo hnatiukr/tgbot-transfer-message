@@ -1,5 +1,6 @@
 import os
 import logging
+import datetime
 import telegram.ext
 from dotenv import load_dotenv
 from telegram.ext import (Updater, CommandHandler, CallbackQueryHandler,
@@ -17,15 +18,29 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get("TOKEN")
 ROOT_CHAT = os.environ.get("ROOT_CHAT")
 REPOST_CHAT = os.environ.get("REPOST_CHAT")
-QUEUE_INTERVAL = os.environ.get("QUEUE_INTERVAL", 3600)
+QUEUE_INTERVAL = int(os.environ.get("QUEUE_INTERVAL", 3600))
+COUNT = int(os.environ.get("COUNT"))
+
+USER_ID = 0
 
 
 def start_cmd(update, context):
     user = update.effective_user
     name = user.first_name if user else 'anonym'
 
+    global USER_ID
+    USER_ID = update.message.chat.id
+
     # Welcome bot on command start
-    reply_text = f'''Hi, {name}!\n\nWith this bot, you can automatically forward the most popular chat messages to other chats.'''
+    reply_text = f'''Hi, {name}!\n\n
+    With this bot, you can automatically forward the most popular chat messages from channel to other chats.\n\n
+    Before to start check your configuration settings:\n
+    Channel for posts: {ROOT_CHAT}
+    Channel for reposts: {REPOST_CHAT}
+    Your user ID: {USER_ID}
+    Time interval between reposts (sec): {QUEUE_INTERVAL}
+    Minimum number of likes (if 0 - half the channel’s subscribers): {COUNT}
+    '''
     update.message.reply_text(reply_text)
 
 
@@ -40,13 +55,12 @@ def error_handler(update, context):
 def attach_button(update, context):
     ''' Attach a button to each message '''
 
-    # Check for chat type (channel)
+    # Check for chat type:
     if update.channel_post:
-        root_chat_id = ROOT_CHAT
-        current_chat_id = update.channel_post.chat.id
+        current_chat_name = update.channel_post.chat.username
 
         # 'Like' button is attached only in the root chat to which the bot is connected
-        if str(current_chat_id) == str(root_chat_id):
+        if str(current_chat_name) == str(ROOT_CHAT[1:]):
             counter = 0
             button_content = '👍'
 
@@ -69,12 +83,12 @@ def button_handler(update, context):
     update_counter_value(update, context, button, counter)
 
     # If the message is popular, we send it to your favorite chats.
-    # now: (1/2 of members)
-    chat_id = ROOT_CHAT
-    members = context.bot.get_chat_members_count(chat_id=chat_id)
-
-    if counter >= members / 2:
+    if COUNT != 0 and counter >= COUNT:
         queue_job(update, context)
+    else:
+        members = context.bot.get_chat_members_count(chat_id=ROOT_CHAT)
+        if counter >= members / 2:
+            queue_job(update, context)
 
 
 def get_like_count(update, context):
@@ -107,13 +121,11 @@ def get_like_count(update, context):
 def update_counter_value(update, context, button, counter):
     ''' Update counter on the 'like' button '''
 
-    chat_id = ROOT_CHAT
     message_id = update.callback_query.message.message_id
-
     keyboard = [[InlineKeyboardButton(button, callback_data=counter)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.edit_message_reply_markup(
-        chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
+        chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
 
 
 def queue_job(update, context):
@@ -138,15 +150,23 @@ def queue_job(update, context):
 
         # Notification that a new message has been added to the publication queue
         context.bot.forward_message(
-            chat_id=78568917,
+            chat_id=USER_ID,
             from_chat_id=ROOT_CHAT,
             message_id=message_id,
             disable_notification=True
         )
+
+        waiting_time = len(bot_data['queue']) * QUEUE_INTERVAL
+        datetime_now = datetime.datetime.now()
+        post_time = datetime_now + datetime.timedelta(seconds=waiting_time)
+        formated_time = post_time.strftime("%H:%M")
+
         context.bot.send_message(
-            chat_id=78568917,
-            text='Message queued for publication 🔝',
-            disable_notification=True
+            chat_id=USER_ID,
+            text=f'''The message has been added to the queue🔝 
+            \nand will be published at *{formated_time}* on the {REPOST_CHAT} channel''',
+            disable_notification=True,
+            parse_mode=telegram.ParseMode.MARKDOWN
         )
 
 
@@ -186,7 +206,6 @@ def main():
     job_minute = j.run_repeating(
         forward_message,
         interval=QUEUE_INTERVAL,
-        first=0,
         context=[ud.bot_data]
     )
 
