@@ -48,10 +48,6 @@ def help_cmd(update, context):
     update.message.reply_text('Use /start to test this bot.')
 
 
-def id_cmd(update, context):
-    update.message.reply_text(f'Your ID is: {update.message.chat.id}')
-
-
 def error_handler(update, context):
     logger.warning('Update "%s" caused error "%s"', update, context.error)
 
@@ -201,7 +197,6 @@ def main():
     ud = updater.dispatcher
     ud.add_handler(CommandHandler('start', start_cmd))
     ud.add_handler(CommandHandler('help', help_cmd))
-    ud.add_handler(CommandHandler('id', id_cmd))
     ud.add_handler(MessageHandler(
         Filters.all & (~Filters.command), attach_button))
     ud.add_handler(CallbackQueryHandler(button_handler))
