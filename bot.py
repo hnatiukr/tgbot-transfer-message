@@ -87,13 +87,12 @@ def button_handler(update, context):
     update_counter_value(update, context, button, counter)
 
     # If the message is popular, we send it to your favorite chats.
-    # now: (1/2 of members)
-    members = context.bot.get_chat_members_count(chat_id=ROOT_CHAT)
-
     if COUNT != 0 and counter >= COUNT:
         queue_job(update, context)
-    elif counter >= members / 2:
-        queue_job(update, context)
+    else:
+        members = context.bot.get_chat_members_count(chat_id=ROOT_CHAT)
+        if counter >= members / 2:
+            queue_job(update, context)
 
 
 def get_like_count(update, context):
@@ -212,7 +211,6 @@ def main():
     job_minute = j.run_repeating(
         forward_message,
         interval=QUEUE_INTERVAL,
-        # first=0,
         context=[ud.bot_data]
     )
 
