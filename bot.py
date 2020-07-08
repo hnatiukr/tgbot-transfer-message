@@ -159,10 +159,10 @@ def queue_job(update, context):
         })
 
         # Notification that a new message has been added to the publication queue
-        bot_notifications(context, message_id)
+        send_queued_post_notification(context, message_id)
 
 
-def bot_notifications(context, message_id):
+def send_queued_post_notification(context, message_id):
     '''Notification that a new message has been added to the publication queue'''
 
     # Forwards the message
@@ -204,8 +204,8 @@ def forward_message(context: telegram.ext.CallbackContext):
     if len(queue) > 0:
         message_data = queue.pop()
 
-        # If the message contains text or Youtube video:
-        if len(message_data['photo']) < 1:
+        # If the message doesn't contains photo, but only text or Youtube video:
+        if not message_data['photo']:
             message_text = message_data['text']
             context.bot.send_message(
                 chat_id=REPOST_CHAT,
@@ -213,8 +213,9 @@ def forward_message(context: telegram.ext.CallbackContext):
                 parse_mode=telegram.ParseMode.MARKDOWN
             )
 
-        # If the message contains an image and a caption:
+        # If the message contains an photo and a caption:
         else:
+            # Choose the photo with the highest quality, which is the last in the list of permissions:
             message_photo = message_data['photo'][-1]['file_id']
             message_caption = message_data['caption']
             context.bot.send_photo(
