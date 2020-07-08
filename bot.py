@@ -48,27 +48,18 @@ def help_cmd(update, context):
     update.message.reply_text('Use /start to test this bot.')
 
 
-def error_handler(update, context):
-    logger.warning('Update "%s" caused error "%s"', update, context.error)
-
-
 def attach_button(update, context):
     ''' Attach a button to each message '''
 
     # Check for chat type:
     if update.channel_post:
-        current_chat_name = update.channel_post.chat.username
-        current_chat_id = update.channel_post.chat.id
+        counter = 0
+        button_content = '👍'
 
-        # 'Like' button is attached only in the root chat to which the bot is connected
-        if str(current_chat_name) == str(ROOT_CHAT[1:]) or str(current_chat_id) == str(ROOT_CHAT):
-            counter = 0
-            button_content = '👍'
-
-            keyboard = [[InlineKeyboardButton(
-                button_content, callback_data=counter)]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            update.channel_post.edit_reply_markup(reply_markup=reply_markup)
+        keyboard = [[InlineKeyboardButton(
+            button_content, callback_data=counter)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.channel_post.edit_reply_markup(reply_markup=reply_markup)
 
 
 def button_handler(update, context):
@@ -233,9 +224,8 @@ def main():
     ud.add_handler(CommandHandler('start', start_cmd))
     ud.add_handler(CommandHandler('help', help_cmd))
     ud.add_handler(MessageHandler(
-        Filters.all & (~Filters.command), attach_button))
+        Filters.all & (~Filters.command) & Filters.chat(username=ROOT_CHAT), attach_button))
     ud.add_handler(CallbackQueryHandler(button_handler))
-    # ud.add_error_handler(error_handler)
 
     j = updater.job_queue
     job_minute = j.run_repeating(
