@@ -58,9 +58,10 @@ def attach_button(update, context):
     # Check for chat type:
     if update.channel_post:
         current_chat_name = update.channel_post.chat.username
+        current_chat_id = update.channel_post.chat.id
 
         # 'Like' button is attached only in the root chat to which the bot is connected
-        if str(current_chat_name) == str(ROOT_CHAT[1:]):
+        if str(current_chat_name) == str(ROOT_CHAT[1:]) or str(current_chat_id) == str(ROOT_CHAT):
             counter = 0
             button_content = '👍'
 
