@@ -21,15 +21,10 @@ REPOST_CHAT = os.environ.get("REPOST_CHAT")
 QUEUE_INTERVAL = int(os.environ.get("QUEUE_INTERVAL", 3600))
 COUNT = int(os.environ.get("COUNT", 0))
 
-USER_ID = 0
-
 
 def start_cmd(update, context):
     user = update.effective_user
     name = user.first_name if user else 'anonym'
-
-    global USER_ID
-    USER_ID = update.message.chat.id
 
     # Welcome bot on command start
     reply_text = f'''Hi, {name}!\n\n
@@ -37,7 +32,6 @@ def start_cmd(update, context):
     Before to start check your configuration settings:\n
     Channel for posts: {ROOT_CHAT}
     Channel for reposts: {REPOST_CHAT}
-    Your user ID: {USER_ID}
     Time interval between reposts (sec): {QUEUE_INTERVAL}
     Minimum number of likes (if 0 - half the channel’s subscribers): {COUNT}
     '''
@@ -76,11 +70,11 @@ def button_handler(update, context):
 
     # If the message is popular, we send it to your favorite chats.
     if COUNT != 0 and counter >= COUNT:
-        queue_job(update, context)
+        queue_job(update, context, button, counter)
     else:
         members = context.bot.get_chat_members_count(chat_id=ROOT_CHAT)
         if counter >= members / 2:
-            queue_job(update, context)
+            queue_job(update, context, button, counter)
 
 
 def get_like_count(update, context):
@@ -120,7 +114,35 @@ def update_counter_value(update, context, button, counter):
         chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
 
 
-def queue_job(update, context):
+def attach_timer_button(update, context, button, counter):
+    ''' Attach a button to each popular message '''
+
+    message_id = update.callback_query.message.message_id
+    formated_time = get_scheduled_queue_time(context)
+    button_timer = f'🔥 {formated_time}'
+    url = f'https://t.me/{REPOST_CHAT[1:]}'
+
+    # Attach timer - button for popular message and update counter on the 'like' button:
+    keyboard = [[InlineKeyboardButton(button, callback_data=counter),
+                 InlineKeyboardButton(button_timer, url=url)]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.edit_message_reply_markup(
+        chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
+
+
+def get_scheduled_queue_time(context):
+    ''' Get the time the message was published from the queue '''
+
+    bot_data = context.bot_data
+    waiting_time = len(bot_data['queue']) * QUEUE_INTERVAL
+    datetime_now = datetime.datetime.now()
+    post_time = datetime_now + datetime.timedelta(seconds=waiting_time)
+    formated_time = post_time.strftime("%H:%M, %a")
+
+    return formated_time
+
+
+def queue_job(update, context, button, counter):
     ''' Remember the current message and add to the job queue '''
 
     message_id = update.callback_query.message.message_id
@@ -138,6 +160,10 @@ def queue_job(update, context):
     # If the current message has not already reposted, remember it and add to the queue:
     if message_id not in chat_data[ROOT_CHAT]:
 
+        # Add a timer - button to messages that have not yet been in the queue:
+        attach_timer_button(update, context, button, counter)
+
+        # Save message data for publication in REPOST_CHAT:
         message_text = update.callback_query.message.text
         message_photo = update.callback_query.message.photo
         message_caption = update.callback_query.message.caption
@@ -149,36 +175,6 @@ def queue_job(update, context):
             'photo': message_photo,
             'caption': message_caption
         })
-
-        # Notification that a new message has been added to the publication queue
-        send_queued_post_notification(context, message_id)
-
-
-def send_queued_post_notification(context, message_id):
-    '''Notification that a new message has been added to the publication queue'''
-
-    # Forwards the message
-    context.bot.forward_message(
-        chat_id=USER_ID,
-        from_chat_id=ROOT_CHAT,
-        message_id=message_id,
-        disable_notification=True
-    )
-
-    # Scheduled queue time
-    bot_data = context.bot_data
-    waiting_time = len(bot_data['queue']) * QUEUE_INTERVAL
-    datetime_now = datetime.datetime.now()
-    post_time = datetime_now + datetime.timedelta(seconds=waiting_time)
-    formated_time = post_time.strftime("%H:%M")
-
-    context.bot.send_message(
-        chat_id=USER_ID,
-        text=f'''The message has been added to the queue🔝 
-            \nand will be published at *{formated_time}* on the {REPOST_CHAT} channel''',
-        disable_notification=True,
-        parse_mode=telegram.ParseMode.MARKDOWN
-    )
 
 
 def forward_message(context: telegram.ext.CallbackContext):
