@@ -145,29 +145,48 @@ def queue_job(update, context):
 
     # If the current message has not already reposted, remember it and add to the queue:
     if message_id not in chat_data[ROOT_CHAT]:
+
+        message_text = update.callback_query.message.text
+        message_photo = update.callback_query.message.photo
+        message_caption = update.callback_query.message.caption
+
         chat_data[ROOT_CHAT].append(message_id)
-        bot_data['queue'].insert(0, message_id)
+        bot_data['queue'].insert(0, {
+            'message_id': message_id,
+            'text': message_text,
+            'photo': message_photo,
+            'caption': message_caption
+        })
 
         # Notification that a new message has been added to the publication queue
-        context.bot.forward_message(
-            chat_id=USER_ID,
-            from_chat_id=ROOT_CHAT,
-            message_id=message_id,
-            disable_notification=True
-        )
+        send_queued_post_notification(context, message_id)
 
-        waiting_time = len(bot_data['queue']) * QUEUE_INTERVAL
-        datetime_now = datetime.datetime.now()
-        post_time = datetime_now + datetime.timedelta(seconds=waiting_time)
-        formated_time = post_time.strftime("%H:%M")
 
-        context.bot.send_message(
-            chat_id=USER_ID,
-            text=f'''The message has been added to the queue🔝 
+def send_queued_post_notification(context, message_id):
+    '''Notification that a new message has been added to the publication queue'''
+
+    # Forwards the message
+    context.bot.forward_message(
+        chat_id=USER_ID,
+        from_chat_id=ROOT_CHAT,
+        message_id=message_id,
+        disable_notification=True
+    )
+
+    # Scheduled queue time
+    bot_data = context.bot_data
+    waiting_time = len(bot_data['queue']) * QUEUE_INTERVAL
+    datetime_now = datetime.datetime.now()
+    post_time = datetime_now + datetime.timedelta(seconds=waiting_time)
+    formated_time = post_time.strftime("%H:%M")
+
+    context.bot.send_message(
+        chat_id=USER_ID,
+        text=f'''The message has been added to the queue🔝 
             \nand will be published at *{formated_time}* on the {REPOST_CHAT} channel''',
-            disable_notification=True,
-            parse_mode=telegram.ParseMode.MARKDOWN
-        )
+        disable_notification=True,
+        parse_mode=telegram.ParseMode.MARKDOWN
+    )
 
 
 def forward_message(context: telegram.ext.CallbackContext):
@@ -183,12 +202,27 @@ def forward_message(context: telegram.ext.CallbackContext):
     queue = bot_data['queue']
 
     if len(queue) > 0:
-        message_id = queue.pop()
-        context.bot.forward_message(
-            chat_id=REPOST_CHAT,
-            from_chat_id=ROOT_CHAT,
-            message_id=message_id,
-        )
+        message_data = queue.pop()
+
+        # If the message doesn't contains photo, but only text or Youtube video:
+        if not message_data['photo']:
+            message_text = message_data['text']
+            context.bot.send_message(
+                chat_id=REPOST_CHAT,
+                text=message_text,
+                parse_mode=telegram.ParseMode.MARKDOWN
+            )
+
+        # If the message contains an photo and a caption:
+        else:
+            # Choose the photo with the highest quality, which is the last in the list of permissions:
+            message_photo = message_data['photo'][-1]['file_id']
+            message_caption = message_data['caption']
+            context.bot.send_photo(
+                chat_id=REPOST_CHAT,
+                photo=message_photo,
+                caption=message_caption,
+            )
 
 
 def main():
