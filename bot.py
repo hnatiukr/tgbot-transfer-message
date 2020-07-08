@@ -19,7 +19,7 @@ TOKEN = os.environ.get("TOKEN")
 ROOT_CHAT = os.environ.get("ROOT_CHAT")
 REPOST_CHAT = os.environ.get("REPOST_CHAT")
 QUEUE_INTERVAL = int(os.environ.get("QUEUE_INTERVAL", 3600))
-COUNT = int(os.environ.get("COUNT"))
+COUNT = int(os.environ.get("COUNT", 0))
 
 USER_ID = 0
 
