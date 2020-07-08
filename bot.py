@@ -71,12 +71,10 @@ def button_handler(update, context):
     # If the message is popular, we send it to your favorite chats.
     if COUNT != 0 and counter >= COUNT:
         queue_job(update, context, button, counter)
-        # attach_timer_button(update, context, button, counter)
     else:
         members = context.bot.get_chat_members_count(chat_id=ROOT_CHAT)
         if counter >= members / 2:
             queue_job(update, context, button, counter)
-            # attach_timer_button(update, context, button, counter)
 
 
 def get_like_count(update, context):
@@ -133,6 +131,8 @@ def attach_timer_button(update, context, button, counter):
 
 
 def get_scheduled_queue_time(context):
+    ''' Get the time the message was published from the queue '''
+
     bot_data = context.bot_data
     waiting_time = len(bot_data['queue']) * QUEUE_INTERVAL
     datetime_now = datetime.datetime.now()
