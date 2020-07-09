@@ -219,8 +219,13 @@ def main():
     ud = updater.dispatcher
     ud.add_handler(CommandHandler('start', start_cmd))
     ud.add_handler(CommandHandler('help', help_cmd))
-    ud.add_handler(MessageHandler(
-        Filters.all & (~Filters.command) & Filters.chat(username=ROOT_CHAT), attach_button))
+
+    if ROOT_CHAT[0] == '@':
+        chat_filter = Filters.chat(username=ROOT_CHAT)
+    else:
+        chat_filter = Filters.chat(chat_id=int(ROOT_CHAT))
+
+    ud.add_handler(MessageHandler(chat_filter, attach_button))
     ud.add_handler(CallbackQueryHandler(button_handler))
 
     j = updater.job_queue
