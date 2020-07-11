@@ -1,3 +1,4 @@
 python-telegram-bot==12.8
 python-dotenv==0.13.0
 pylint==2.5.3
+humanize==2.5.0

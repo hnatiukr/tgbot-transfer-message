@@ -1,6 +1,8 @@
 import os
 import logging
 import datetime
+import humanize
+import time
 import telegram.ext
 from dotenv import load_dotenv
 from telegram.ext import (Updater, CommandHandler, CallbackQueryHandler,
@@ -114,34 +116,6 @@ def update_counter_value(update, context, button, counter):
         chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
 
 
-def attach_timer_button(update, context, button, counter):
-    ''' Attach a button to each popular message '''
-
-    message_id = update.callback_query.message.message_id
-    formated_time = get_scheduled_queue_time(context)
-    button_timer = f'🔥 {formated_time}'
-    url = f'https://t.me/{REPOST_CHAT[1:]}'
-
-    # Attach timer - button for popular message and update counter on the 'like' button:
-    keyboard = [[InlineKeyboardButton(button, callback_data=counter),
-                 InlineKeyboardButton(button_timer, url=url)]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.edit_message_reply_markup(
-        chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
-
-
-def get_scheduled_queue_time(context):
-    ''' Get the time the message was published from the queue '''
-
-    bot_data = context.bot_data
-    waiting_time = len(bot_data['queue']) * QUEUE_INTERVAL
-    datetime_now = datetime.datetime.now()
-    post_time = datetime_now + datetime.timedelta(seconds=waiting_time)
-    formated_time = post_time.strftime("%H:%M, %a")
-
-    return formated_time
-
-
 def queue_job(update, context, button, counter):
     ''' Remember the current message and add to the job queue '''
 
@@ -160,21 +134,24 @@ def queue_job(update, context, button, counter):
     # If the current message has not already reposted, remember it and add to the queue:
     if message_id not in chat_data[ROOT_CHAT]:
 
-        # Add a timer - button to messages that have not yet been in the queue:
-        attach_timer_button(update, context, button, counter)
-
         # Save message data for publication in REPOST_CHAT:
         message_text = update.callback_query.message.text
         message_photo = update.callback_query.message.photo
         message_caption = update.callback_query.message.caption
+        reply_markup = update.callback_query.message.reply_markup
 
         chat_data[ROOT_CHAT].append(message_id)
         bot_data['queue'].insert(0, {
             'message_id': message_id,
             'text': message_text,
             'photo': message_photo,
-            'caption': message_caption
+            'caption': message_caption,
+            'reply_markup': reply_markup,
+            'post_time': get_post_time_sec(context)
         })
+
+        # Add a timer - button to messages that have not yet been in the queue:
+        attach_timer_button(context)
 
 
 def forward_message(context: telegram.ext.CallbackContext):
@@ -212,6 +189,83 @@ def forward_message(context: telegram.ext.CallbackContext):
                 caption=message_caption,
             )
 
+        # Change the button to "POSTED" after posting a message
+        attach_posted_button(context, message_data)
+
+
+def get_post_time_sec(context):
+    ''' Get the time in "ms" the message was published from the queue '''
+
+    bot_data = context.bot_data
+    unix_time = int(time.time())
+
+    if not bot_data['queue']:
+        post_time_sec = unix_time + QUEUE_INTERVAL
+    else:
+        prev_post_time = int(bot_data['queue'][0]['post_time'])
+        post_time_sec = prev_post_time + QUEUE_INTERVAL
+
+    return post_time_sec
+
+
+def attach_timer_button(context: telegram.ext.CallbackContext):
+    ''' Attach a button to each popular message '''
+
+    bot_data = context.bot_data
+
+    # If the queue has not yet been created or empty, exit the function:
+    if 'queue' not in bot_data or not bot_data['queue']:
+        return
+
+    # If there are elements in the queue, forward the message:
+    for message in bot_data['queue']:
+
+        message_id = message['message_id']
+        post_time = int(message['post_time'])
+        unix_time = int(time.time())
+
+        delta = post_time - unix_time
+
+        print(f'''
+        -----------
+        {delta}
+        -------------
+        ''')
+
+        formated_time = humanize.naturaldelta(
+            datetime.timedelta(seconds=delta)
+        )
+
+        button_text = f'⏱ {formated_time} till posted'
+
+        url = f'https://t.me/{REPOST_CHAT[1:]}'
+
+        # Attach timer - button for popular message and update counter on the 'like' button:
+        keyboard = [[InlineKeyboardButton(button_text, url=url)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.edit_message_reply_markup(
+            chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
+
+
+def attach_posted_button(context, message_data):
+    ''' Change the button to "POSTED" after posting a message '''
+
+    bot_data = context.bot_data
+
+    # Create posted if not exist and add posted message_id:
+    if 'posted' not in bot_data:
+        bot_data['posted'] = []
+
+    bot_data['posted'].append(message_data['message_id'])
+    message_id = bot_data['posted'][-1]
+    url = f'https://t.me/{REPOST_CHAT[1:]}'
+
+    # Attach timer - button for popular message and update counter on the 'like' button:
+    keyboard = [[InlineKeyboardButton('✔️ POSTED', url=url)]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.edit_message_reply_markup(
+        chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
+
 
 def main():
     my_persistence = PicklePersistence(filename='bot_data')
@@ -227,11 +281,20 @@ def main():
 
     ud.add_handler(MessageHandler(chat_filter, attach_button))
     ud.add_handler(CallbackQueryHandler(button_handler))
+    ud.add_handler(CallbackQueryHandler(attach_timer_button))
 
     j = updater.job_queue
-    job_minute = j.run_repeating(
+
+    j.run_repeating(
+        attach_timer_button,
+        interval=QUEUE_INTERVAL,
+        first=QUEUE_INTERVAL / 2
+    )
+
+    j.run_repeating(
         forward_message,
         interval=QUEUE_INTERVAL,
+        first=QUEUE_INTERVAL,
         context=[ud.bot_data]
     )
 
