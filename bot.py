@@ -147,14 +147,14 @@ def queue_job(update, context, button, counter):
             'photo': message_photo,
             'caption': message_caption,
             'reply_markup': reply_markup,
-            'post_time': get_post_time_sec(context)
+            'post_time': bot_data['next_queue_update']
         })
 
         # Add a timer - button to messages that have not yet been in the queue:
         attach_timer_button(context)
 
-        # Save the publication time of the current message:
-        bot_data['last_post_time'] = get_post_time_sec(context)
+        # As soon as we add a new message to the queue, commit the time of the next update:
+        bot_data['next_queue_update'] += QUEUE_INTERVAL
 
 
 def forward_message(context: telegram.ext.CallbackContext):
@@ -192,21 +192,8 @@ def forward_message(context: telegram.ext.CallbackContext):
                 caption=message_caption,
             )
 
-        # Immediately after sending a message, save current time:
-        bot_data['last_post_time'] = int(time.time())
-
         # Change the button to "POSTED" after posting a message
         attach_posted_button(context, message_data)
-
-
-def get_post_time_sec(context):
-    ''' Get the time in "ms" the message was published from the queue '''
-
-    bot_data = context.bot_data
-    prev_post_time = bot_data['last_post_time']
-    post_time = prev_post_time + QUEUE_INTERVAL
-
-    return post_time
 
 
 def attach_timer_button(context: telegram.ext.CallbackContext):
@@ -226,12 +213,11 @@ def attach_timer_button(context: telegram.ext.CallbackContext):
         unix_time = int(time.time())
         delta = post_time - unix_time
         formated_time = humanize.naturaldelta(dt.timedelta(seconds=delta))
-
-        button_text = f'⏱ {formated_time} till posted'
+        button_content = f'⏱ {formated_time} till posted'
         url = f'https://t.me/{REPOST_CHAT[1:]}'
 
         # Attach timer - button for popular message and update counter on the 'like' button:
-        keyboard = [[InlineKeyboardButton(button_text, url=url)]]
+        keyboard = [[InlineKeyboardButton(button_content, url=url)]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.edit_message_reply_markup(
             chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
@@ -257,6 +243,17 @@ def attach_posted_button(context, message_data):
         chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
 
 
+def restart_queue_timer(context: telegram.ext.CallbackContext):
+    ''' Save next update time if queue is empty '''
+
+    bot_data = context.job.context[0]
+
+    # If the queue is empty or does not exist, commit the timer update:
+    if 'queue' not in bot_data or not bot_data['queue']:
+        unix_time = int(time.time())
+        bot_data['next_queue_update'] = unix_time + QUEUE_INTERVAL
+
+
 def main():
     my_persistence = PicklePersistence(filename='bot_data')
     updater = Updater(TOKEN, persistence=my_persistence, use_context=True)
@@ -272,6 +269,8 @@ def main():
     ud.add_handler(MessageHandler(chat_filter, attach_button))
     ud.add_handler(CallbackQueryHandler(button_handler))
     ud.add_handler(CallbackQueryHandler(attach_timer_button))
+
+    print(f'Bot is working now ...')
 
     j = updater.job_queue
 
@@ -289,11 +288,15 @@ def main():
         context=[ud.bot_data]
     )
 
-    # Immediately after starting the bot, fix the current time:
-    ud.bot_data['last_post_time'] = int(time.time())
+    # Commit the time of the next timer's update of the queue:
+    j.run_repeating(
+        restart_queue_timer,
+        interval=QUEUE_INTERVAL,
+        first=0,
+        context=[ud.bot_data]
+    )
 
     updater.start_polling()
-    print(f'Bot is working now ...')
     updater.idle()
 
 
