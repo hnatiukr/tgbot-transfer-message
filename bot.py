@@ -1,6 +1,6 @@
 import os
 import logging
-import datetime
+import datetime as dt
 import humanize
 import time
 import telegram.ext
@@ -153,6 +153,9 @@ def queue_job(update, context, button, counter):
         # Add a timer - button to messages that have not yet been in the queue:
         attach_timer_button(context)
 
+        # Save the publication time of the current message:
+        bot_data['last_post_time'] = get_post_time_sec(context)
+
 
 def forward_message(context: telegram.ext.CallbackContext):
     ''' Bot forward a message to another chat from queue once an hour '''
@@ -189,6 +192,9 @@ def forward_message(context: telegram.ext.CallbackContext):
                 caption=message_caption,
             )
 
+        # Immediately after sending a message, save current time:
+        bot_data['last_post_time'] = int(time.time())
+
         # Change the button to "POSTED" after posting a message
         attach_posted_button(context, message_data)
 
@@ -197,15 +203,10 @@ def get_post_time_sec(context):
     ''' Get the time in "ms" the message was published from the queue '''
 
     bot_data = context.bot_data
-    unix_time = int(time.time())
+    prev_post_time = bot_data['last_post_time']
+    post_time = prev_post_time + QUEUE_INTERVAL
 
-    if not bot_data['queue']:
-        post_time_sec = unix_time + QUEUE_INTERVAL
-    else:
-        prev_post_time = int(bot_data['queue'][0]['post_time'])
-        post_time_sec = prev_post_time + QUEUE_INTERVAL
-
-    return post_time_sec
+    return post_time
 
 
 def attach_timer_button(context: telegram.ext.CallbackContext):
@@ -217,27 +218,16 @@ def attach_timer_button(context: telegram.ext.CallbackContext):
     if 'queue' not in bot_data or not bot_data['queue']:
         return
 
-    # If there are elements in the queue, forward the message:
+    # If there are elements in the queue, attach a timer-button:
     for message in bot_data['queue']:
 
         message_id = message['message_id']
         post_time = int(message['post_time'])
         unix_time = int(time.time())
-
         delta = post_time - unix_time
-
-        print(f'''
-        -----------
-        {delta}
-        -------------
-        ''')
-
-        formated_time = humanize.naturaldelta(
-            datetime.timedelta(seconds=delta)
-        )
+        formated_time = humanize.naturaldelta(dt.timedelta(seconds=delta))
 
         button_text = f'⏱ {formated_time} till posted'
-
         url = f'https://t.me/{REPOST_CHAT[1:]}'
 
         # Attach timer - button for popular message and update counter on the 'like' button:
@@ -285,18 +275,22 @@ def main():
 
     j = updater.job_queue
 
+    # At each time interval, the bot checks messages in the queue and updates the timer in the buttons:
     j.run_repeating(
         attach_timer_button,
         interval=QUEUE_INTERVAL,
-        first=QUEUE_INTERVAL / 2
     )
 
+    # At each time interval, the bot checks the messages in the queue and sends them:
     j.run_repeating(
         forward_message,
         interval=QUEUE_INTERVAL,
         first=QUEUE_INTERVAL,
         context=[ud.bot_data]
     )
+
+    # Immediately after starting the bot, fix the current time:
+    ud.bot_data['last_post_time'] = int(time.time())
 
     updater.start_polling()
     print(f'Bot is working now ...')
