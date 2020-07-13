@@ -29,19 +29,62 @@ def start_cmd(update, context):
     name = user.first_name if user else 'anonym'
 
     # Welcome bot on command start
-    reply_text = f'''Hi, {name}!\n\n
-    With this bot, you can automatically forward the most popular chat messages from channel to other chats.\n\n
-    Before to start check your configuration settings:\n
-    Channel for posts: {ROOT_CHAT}
-    Channel for reposts: {REPOST_CHAT}
-    Time interval between reposts (sec): {QUEUE_INTERVAL}
-    Minimum number of likes (if 0 - half the channel’s subscribers): {COUNT}
+    reply_text = f'''Hi, {name}!\n
+    You can automatically forward the most popular chat messages from channel to other chats.
+    \nClick the /config to check the current bot configuration.
     '''
     update.message.reply_text(reply_text)
+    update.message.reply_text(
+        'Information about the queue of messages ready for publication: /queue')
 
 
 def help_cmd(update, context):
     update.message.reply_text('Use /start to test this bot.')
+
+
+def config_cmd(update, context):
+    interval = humanize.naturaldelta(dt.timedelta(seconds=QUEUE_INTERVAL))
+    content = f'''
+    Your configuration settings:\n
+    {check_is_empty_config_var(ROOT_CHAT)} Channel for posts: {ROOT_CHAT}
+    {check_is_empty_config_var(REPOST_CHAT)} Channel for reposts: {REPOST_CHAT}
+    {check_is_empty_config_var(QUEUE_INTERVAL)} Time interval between reposts: {interval}
+    {check_is_empty_config_var(COUNT)} Minimum number of likes: {COUNT}
+    (if 0 - half the channel’s subscribers)
+    '''
+    update.message.reply_text(content)
+    update.message.reply_text(
+        'Information about the queue of messages ready for publication: /queue')
+
+
+def queue_cmd(update, context):
+
+    bot_data = context.bot_data
+
+    if 'queue' not in bot_data:
+        content = 'The message queue has not yet been created.'
+    elif not bot_data['queue']:
+        content = 'There are no messages in the queue.'
+    else:
+        queue = bot_data['queue']
+        last_post_time = queue[0]['post_time']
+        unix_time = int(time.time())
+        delta = last_post_time - unix_time
+        formated_post_time = humanize.naturaldelta(dt.timedelta(seconds=delta))
+
+        content = f'''
+        In the queue for publication: {len(queue)} message(s)
+        \nThe latest publication will be published in {formated_post_time}
+        '''
+
+    update.message.reply_text(content)
+
+
+def check_is_empty_config_var(var):
+    if not var:
+        return '❌'
+    else:
+        return '✔️'
 
 
 def attach_button(update, context):
@@ -217,7 +260,8 @@ def attach_timer_button(context: telegram.ext.CallbackContext):
         url = f'https://t.me/{REPOST_CHAT[1:]}'
 
         # Attach timer - button for popular message and update counter on the 'like' button:
-        keyboard = [[InlineKeyboardButton(button_content, url=url)]]
+        keyboard = [[InlineKeyboardButton(
+            button_content, url=url, callback_data=post_time)]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.edit_message_reply_markup(
             chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
@@ -259,6 +303,8 @@ def main():
     updater = Updater(TOKEN, persistence=my_persistence, use_context=True)
     ud = updater.dispatcher
     ud.add_handler(CommandHandler('start', start_cmd))
+    ud.add_handler(CommandHandler('config', config_cmd))
+    ud.add_handler(CommandHandler('queue', queue_cmd))
     ud.add_handler(CommandHandler('help', help_cmd))
 
     if ROOT_CHAT[0] == '@':
