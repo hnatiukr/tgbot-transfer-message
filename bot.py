@@ -332,7 +332,7 @@ def main():
     updater = Updater(TOKEN, persistence=my_persistence, use_context=True)
     ud = updater.dispatcher
 
-    print(f'Bot is working now ...')
+    print('Bot is working now ...')
 
     ud.add_handler(CommandHandler('start', start_cmd))
     ud.add_handler(CommandHandler('config', config_cmd))
