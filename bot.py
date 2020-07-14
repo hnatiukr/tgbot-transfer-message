@@ -190,7 +190,8 @@ def queue_job(update, context, button, counter):
             'photo': message_photo,
             'caption': message_caption,
             'reply_markup': reply_markup,
-            'post_time': bot_data['next_queue_update']
+            'post_time': bot_data['next_queue_update'],
+            'formated_time': None
         })
 
         # Add a timer - button to messages that have not yet been in the queue:
@@ -239,7 +240,7 @@ def forward_message(context: telegram.ext.CallbackContext):
         attach_posted_button(context, message_data)
 
 
-def attach_timer_button(context: telegram.ext.CallbackContext):
+def attach_timer_button(context):
     ''' Attach a button to each popular message '''
 
     bot_data = context.bot_data
@@ -251,20 +252,31 @@ def attach_timer_button(context: telegram.ext.CallbackContext):
     # If there are elements in the queue, attach a timer-button:
     for message in bot_data['queue']:
 
-        message_id = message['message_id']
+        # Get the current time remaining before publication:
         post_time = int(message['post_time'])
         unix_time = int(time.time())
         delta = post_time - unix_time
         formated_time = humanize.naturaldelta(dt.timedelta(seconds=delta))
-        button_content = f'⏱ {formated_time} till posted'
-        url = f'https://t.me/{REPOST_CHAT[1:]}'
 
-        # Attach timer - button for popular message and update counter on the 'like' button:
-        keyboard = [[InlineKeyboardButton(
-            button_content, url=url, callback_data=post_time)]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        context.bot.edit_message_reply_markup(
-            chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
+        # Get the remaining time in the previous update, save the new one:
+        prev_formated_time = message['formated_time']
+        message['formated_time'] = formated_time
+
+        # We verify the identity of the current timer and the timer in the previous update.
+        # If they are the same, we exit to avoid an API error:
+        if prev_formated_time != formated_time:
+
+            # Attach timer - button for popular message and update counter on the 'like' button:
+            message_id = message['message_id']
+            button_content = f'⏱ {formated_time} till posted'
+            url = f'https://t.me/{REPOST_CHAT[1:]}'
+
+            keyboard = [[InlineKeyboardButton(button_content, url=url)]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            context.bot.edit_message_reply_markup(
+                chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
+        else:
+            return
 
 
 def attach_posted_button(context, message_data):
@@ -284,7 +296,7 @@ def attach_posted_button(context, message_data):
     keyboard = [[InlineKeyboardButton('✔️ POSTED', url=url)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.edit_message_reply_markup(
-        chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
+        chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup, timeout=30)
 
 
 def restart_queue_timer(context: telegram.ext.CallbackContext):
@@ -323,7 +335,7 @@ def main():
     # At each time interval, the bot checks messages in the queue and updates the timer in the buttons:
     j.run_repeating(
         attach_timer_button,
-        interval=QUEUE_INTERVAL,
+        interval=QUEUE_INTERVAL
     )
 
     # At each time interval, the bot checks the messages in the queue and sends them:
