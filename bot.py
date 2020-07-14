@@ -299,7 +299,7 @@ def attach_posted_button(context, message_data):
         chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup, timeout=30)
 
 
-def restart_queue_timer(context: telegram.ext.CallbackContext):
+def sync_queue_timer(context: telegram.ext.CallbackContext):
     ''' Save next update time if queue is empty '''
 
     bot_data = context.job.context[0]
@@ -308,6 +308,18 @@ def restart_queue_timer(context: telegram.ext.CallbackContext):
     if 'queue' not in bot_data or not bot_data['queue']:
         unix_time = int(time.time())
         bot_data['next_queue_update'] = unix_time + QUEUE_INTERVAL
+
+
+def check_queue(context: telegram.ext.CallbackContext):
+
+    # Synchronize queue timer:
+    sync_queue_timer(context)
+
+    # Updating timers on all message buttons in the queue:
+    attach_timer_button(context)
+
+    # If there is a message in the queue, publish it:
+    forward_message(context)
 
 
 def main():
@@ -332,23 +344,8 @@ def main():
 
     j = updater.job_queue
 
-    # At each time interval, the bot checks messages in the queue and updates the timer in the buttons:
     j.run_repeating(
-        attach_timer_button,
-        interval=QUEUE_INTERVAL
-    )
-
-    # At each time interval, the bot checks the messages in the queue and sends them:
-    j.run_repeating(
-        forward_message,
-        interval=QUEUE_INTERVAL,
-        first=QUEUE_INTERVAL,
-        context=[ud.bot_data]
-    )
-
-    # Commit the time of the next timer's update of the queue:
-    j.run_repeating(
-        restart_queue_timer,
+        check_queue,
         interval=QUEUE_INTERVAL,
         first=0,
         context=[ud.bot_data]
