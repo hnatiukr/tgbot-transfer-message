@@ -61,9 +61,7 @@ def queue_cmd(update, context):
 
     bot_data = context.bot_data
 
-    if 'queue' not in bot_data:
-        content = 'The message queue has not yet been created.'
-    elif not bot_data['queue']:
+    if not bot_data['queue']:
         content = 'There are no messages in the queue.'
     else:
         queue = bot_data['queue']
@@ -87,7 +85,7 @@ def check_is_empty_config_var(var):
         return '✔️'
 
 
-def attach_button(update, context):
+def attach_counter_button(update, context):
     ''' Attach a button to each message '''
 
     # Check for chat type:
@@ -154,9 +152,7 @@ def update_counter_value(update, context, button, counter):
 
     message_id = update.callback_query.message.message_id
     keyboard = [[InlineKeyboardButton(button, callback_data=counter)]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.edit_message_reply_markup(
-        chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
+    edit_message_reply_markup(context, keyboard, message_id)
 
 
 def queue_job(update, context, button, counter):
@@ -169,10 +165,6 @@ def queue_job(update, context, button, counter):
     # If there are no current chat entries:
     if ROOT_CHAT not in chat_data:
         chat_data[ROOT_CHAT] = []
-
-    # Create queue if not exist:
-    if 'queue' not in bot_data:
-        bot_data['queue'] = []
 
     # If the current message has not already reposted, remember it and add to the queue:
     if message_id not in chat_data[ROOT_CHAT]:
@@ -189,7 +181,6 @@ def queue_job(update, context, button, counter):
             'text': message_text,
             'photo': message_photo,
             'caption': message_caption,
-            'reply_markup': reply_markup,
             'post_time': bot_data['next_queue_update'],
             'formated_time': None
         })
@@ -205,10 +196,6 @@ def forward_message(context: telegram.ext.CallbackContext):
     ''' Bot forward a message to another chat from queue once an hour '''
 
     bot_data = context.job.context[0]
-
-    # If the queue has not yet been created, exit the function:
-    if 'queue' not in bot_data:
-        return
 
     # If there are elements in the queue, forward the message:
     queue = bot_data['queue']
@@ -246,7 +233,7 @@ def attach_timer_button(context):
     bot_data = context.bot_data
 
     # If the queue has not yet been created or empty, exit the function:
-    if 'queue' not in bot_data or not bot_data['queue']:
+    if not bot_data['queue']:
         return
 
     # If there are elements in the queue, attach a timer-button:
@@ -266,37 +253,26 @@ def attach_timer_button(context):
         # If they are the same, we exit to avoid an API error:
         if prev_formated_time != formated_time:
 
-            # Attach timer - button for popular message and update counter on the 'like' button:
             message_id = message['message_id']
             button_content = f'⏱ {formated_time} till posted'
             url = f'https://t.me/{REPOST_CHAT[1:]}'
 
+            # Attach timer - button for popular message and update counter on the 'like' button:
             keyboard = [[InlineKeyboardButton(button_content, url=url)]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            context.bot.edit_message_reply_markup(
-                chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup)
-        else:
-            return
+            edit_message_reply_markup(context, keyboard, message_id)
 
 
 def attach_posted_button(context, message_data):
     ''' Change the button to "POSTED" after posting a message '''
 
     bot_data = context.bot_data
-
-    # Create posted if not exist and add posted message_id:
-    if 'posted' not in bot_data:
-        bot_data['posted'] = []
-
     bot_data['posted'].append(message_data['message_id'])
     message_id = bot_data['posted'][-1]
     url = f'https://t.me/{REPOST_CHAT[1:]}'
 
     # Attach timer - button for popular message and update counter on the 'like' button:
     keyboard = [[InlineKeyboardButton('✔️ POSTED', url=url)]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.edit_message_reply_markup(
-        chat_id=ROOT_CHAT, message_id=message_id, reply_markup=reply_markup, timeout=30)
+    edit_message_reply_markup(context, keyboard, message_id)
 
 
 def sync_queue_timer(context: telegram.ext.CallbackContext):
@@ -305,7 +281,7 @@ def sync_queue_timer(context: telegram.ext.CallbackContext):
     bot_data = context.job.context[0]
 
     # If the queue is empty or does not exist, commit the timer update:
-    if 'queue' not in bot_data or not bot_data['queue']:
+    if not bot_data['queue']:
         unix_time = int(time.time())
         bot_data['next_queue_update'] = unix_time + QUEUE_INTERVAL
 
@@ -322,10 +298,42 @@ def check_queue(context: telegram.ext.CallbackContext):
     forward_message(context)
 
 
+def edit_message_reply_markup(context, keyboard, message_id):
+    ''' Attach button layout and update '''
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.edit_message_reply_markup(
+        chat_id=ROOT_CHAT,
+        message_id=message_id,
+        reply_markup=reply_markup,
+        timeout=30
+    )
+
+
+def create_keys_bot_data(bot_data):
+    ''' Create key in bot_data if not exist '''
+
+    # List of queued messages:
+    if 'queue' not in bot_data:
+        bot_data['queue'] = []
+
+    # List of posted messages:
+    if 'posted' not in bot_data:
+        bot_data['posted'] = []
+
+    # Queue last update time:
+    if 'next_queue_update' not in bot_data:
+        unix_time = int(time.time())
+        bot_data['next_queue_update'] = unix_time
+
+
 def main():
     my_persistence = PicklePersistence(filename='bot_data')
     updater = Updater(TOKEN, persistence=my_persistence, use_context=True)
     ud = updater.dispatcher
+
+    print(f'Bot is working now ...')
+
     ud.add_handler(CommandHandler('start', start_cmd))
     ud.add_handler(CommandHandler('config', config_cmd))
     ud.add_handler(CommandHandler('queue', queue_cmd))
@@ -336,11 +344,11 @@ def main():
     else:
         chat_filter = Filters.chat(chat_id=int(ROOT_CHAT))
 
-    ud.add_handler(MessageHandler(chat_filter, attach_button))
+    ud.add_handler(MessageHandler(chat_filter, attach_counter_button))
     ud.add_handler(CallbackQueryHandler(button_handler))
     ud.add_handler(CallbackQueryHandler(attach_timer_button))
 
-    print(f'Bot is working now ...')
+    create_keys_bot_data(ud.bot_data)
 
     j = updater.job_queue
 
