@@ -16,11 +16,11 @@ This API is tested with Python 3.7, Python 3.8. There is way to install the bot:
 3. Add the environment variables with values to the created **.env** file:
 
 ```
-	TOKEN=012356789:YOUR_BOT_TOKEN
-    ROOT_CHAT=@channel_name 			// (or: ROOT_CHAT=-100123456789)
+    TOKEN=012356789:YOUR_BOT_TOKEN
+    ROOT_CHAT=@channel_name 		// (or: ROOT_CHAT=-100123456789)
     REPOST_CHAT=@another_channel_name 	// (or: REPOST_CHAT=-100123456789)
-    QUEUE_INTERVAL=3600					// optional
-    COUNT=0								// optional
+    QUEUE_INTERVAL=3600			// optional
+    COUNT=0				// optional
 ```
 
 **TOKEN**: Token of your Bot for authorization in Telegram API. [How to get a token?](https://core.telegram.org/bots#6-botfather)
